@@ -1,8 +1,24 @@
 import os
 import requests
+from enum import Enum
 
 TRAVIS_BASE_URL = 'https://api.travis-ci.org/'
 TRAVIS_BADGE_URL = TRAVIS_BASE_URL + '{group}/{repo}.svg?branch={branch}'
+
+
+class Status(Enum):
+    ERROR = 'error'
+    UNKNOWN = 'unknown'
+    FAILING = 'failing'
+    PASSING = 'passing'
+
+
+StatusVariants = {
+  Status.ERROR:   ('error',),
+  Status.FAILING: ('failing', 'failed'),
+  Status.PASSING: ('passing', 'passed'),
+  Status.UNKNOWN: ('unknown',),
+}
 
 
 class SvgRequestFailed(Exception):
@@ -14,6 +30,15 @@ def var_is_true(var):
         return True
     else:
         return False
+
+
+def status_from_badge_svg(svg):
+    svg = svg.lower()
+
+    for status, variants in StatusVariants.items():
+        for variant in variants:
+            if variant in svg:
+                return status
 
 
 class TravisVariables(type):
@@ -97,3 +122,10 @@ class Travis(metaclass=TravisVariables):
     def get_travis_badge_url(group, repo, branch):
         return TRAVIS_BADGE_URL.format(
             group=group, repo=repo, branch=branch)
+
+    @staticmethod
+    def get_travis_status(group, repo, branch):
+        svg = Travis.get_svg_from_badge_url(Travis.get_travis_badge_url(group,
+                                                                        repo,
+                                                                        branch))
+        return status_from_badge_svg(svg.text)
